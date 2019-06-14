@@ -1,0 +1,204 @@
+#include <PS2X_lib.h>  //for v1.6
+#include <Servo.h>
+#define ENA 6
+#define IN1 3
+#define IN2 2
+
+PS2X ps2x; // create PS2 Controller Class
+Servo servo;
+
+//right now, the library does NOT support hot pluggable controllers, meaning
+//you must always either restart your Arduino after you conect the controller,
+//or call config_gamepad(pins) again after connecting the controller.
+int error = 0;
+byte type = 0;
+byte vibrate = 0;
+
+bool Direction = true;
+bool Go = false;
+int Angle = 0;
+int Speed = 0;
+
+void setup() {
+  Serial.begin(57600);
+  servo.attach(5);
+  pinMode(A0, INPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  error = ps2x.config_gamepad(13, 11, 10, 12, true, true); //(clock, command, attention, data, Pressures?, Rumble?)
+  if (error == 0) {
+    Serial.println("Found Controller, configured successful");
+  }
+
+  else if (error == 1)
+    Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
+
+  else if (error == 2)
+    Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
+
+  else if (error == 3)
+    Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
+
+  type = ps2x.readType();
+  switch (type) {
+    case 0:
+      Serial.println("Unknown Controller type");
+      break;
+    case 1:
+      Serial.println("DualShock Controller Found");
+      break;
+    case 2:
+      Serial.println("GuitarHero Controller Found");
+      break;
+  }
+
+}
+
+void loop() {
+
+
+  if (error == 1) //skip loop if no controller found
+    return;
+
+  if (type != 2)
+  { //DualShock Controller
+
+    ps2x.read_gamepad(false, vibrate);          //считываем данные с контроллера
+    //vibrate = analogRead(A0) / 2;      //включаем вибрацию, если робот в "отключке"
+
+    if (ps2x.Button(PSB_BLUE))               //если удерживаем "ИКС"
+    {
+      Direction = true;
+      Go = true;
+      int Speed = 180;
+      if (ps2x.Button(PSB_PINK))
+      {
+        int Speed = 255;
+      }
+
+    }
+    else if (ps2x.Button(PSB_PINK))          //если удерживаем "КВАДРАТ"
+    {
+
+      Direction = false;
+      Go = true;
+      int Speed = 255;
+      //tone(8, 4000, 200);
+      //delay(500);
+      Serial.println("BACK!");
+
+    }
+    else                                     //если ничего не удерживаем
+    {
+      Speed = 0;
+      Direction = true;
+      Go = false;
+    }
+
+    if (Go)
+    {
+      if (Direction)
+      {
+        //analogWrite(ENA, ps2x.Analog(PSAB_BLUE));
+        //analogWrite(ENB, ps2x.Analog(PSAB_BLUE));
+        //Serial.println(ps2x.Analog(PSAB_BLUE));
+
+        analogWrite(ENA, 255);
+        //     analogWrite(ENB, 255);
+        Serial.println(ps2x.Analog(PSAB_BLUE));
+      }
+      else {
+        analogWrite(ENA, 255);
+        //       analogWrite(ENB, 180);
+        Serial.println(ps2x.Analog(PSAB_PINK));
+      }
+    }
+    else
+    {
+      analogWrite(ENA, 0);
+      //    analogWrite(ENB, 0);
+    }
+
+
+    digitalWrite(IN1, !Direction);
+    digitalWrite(IN2, Direction);
+    //   digitalWrite(IN3, Direction);
+    //   digitalWrite(IN4, !Direction);
+
+    //delay(50);
+
+    int x = map(ps2x.Analog(PSS_LX), 0, 255, 30, 90); // 30 90
+
+    servo.write(x);
+    Serial.println(Speed);
+
+    //if (ps2x.Button(PSB_R1))            //will be TRUE if button was JUST pressed
+    //  tone(8, 3500, 200);
+    delay(20);
+    /*
+        if (ps2x.Button(PSB_START))                  //will be TRUE as long as button is pressed
+          Serial.println("Start is being held");
+
+        if (ps2x.Button(PSB_PAD_UP)) {        //will be TRUE as long as button is pressed
+          Serial.print("Up held this hard: ");
+          Serial.println(ps2x.Analog(PSAB_PAD_UP), DEC);
+        }
+        if (ps2x.Button(PSB_PAD_RIGHT)) {
+          Serial.print("Right held this hard: ");
+          Serial.println(ps2x.Analog(PSAB_PAD_RIGHT), DEC);
+        }
+        if (ps2x.Button(PSB_PAD_LEFT)) {
+          Serial.print("LEFT held this hard: ");
+          Serial.println(ps2x.Analog(PSAB_PAD_LEFT), DEC);
+        }
+        if (ps2x.Button(PSB_PAD_DOWN)) {
+          Serial.print("DOWN held this hard: ");
+          Serial.println(ps2x.Analog(PSAB_PAD_DOWN), DEC);
+        }
+
+
+        if (ps2x.NewButtonState())               //will be TRUE if any button changes state (on to off, or off to on)
+        {
+
+          if (ps2x.Button(PSB_L3))
+            Serial.println("L3 pressed");
+          if (ps2x.Button(PSB_R3))
+            Serial.println("R3 pressed");
+          if (ps2x.Button(PSB_L2))
+            Serial.println("L2 pressed");
+          if (ps2x.Button(PSB_R2))
+            Serial.println("R2 pressed");
+          if (ps2x.Button(PSB_GREEN))
+            Serial.println("Triangle pressed");
+
+        }
+
+
+        if (ps2x.ButtonPressed(PSB_BLUE))            //will be TRUE if button was JUST pressed
+          Serial.println("FORWARD");
+
+        if (ps2x.ButtonReleased(PSB_PINK))            //will be TRUE if button was JUST released
+          Serial.println("Square just released");
+
+        if (ps2x.NewButtonState(PSB_BLUE))           //will be TRUE if button was JUST pressed OR released
+          Serial.println("X just changed");
+
+
+        if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) // print stick values if either is TRUE
+        {
+          Serial.print("Stick Values:");
+          Serial.print(ps2x.Analog(PSS_LY), DEC); //Left stick, Y axis. Other options: LX, RY, RX
+          Serial.print(",");
+          Serial.print(ps2x.Analog(PSS_LX), DEC);
+          Serial.print(",");
+          Serial.print(ps2x.Analog(PSS_RY), DEC);
+          Serial.print(",");
+          Serial.println(ps2x.Analog(PSS_RX), DEC);
+        }
+
+    */
+  }
+}
+
